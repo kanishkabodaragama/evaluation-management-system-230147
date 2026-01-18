@@ -12,11 +12,16 @@ import { createClient } from "@supabase/supabase-js";
  */
 function getSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // Support both variable names:
+  // - NEXT_PUBLIC_SUPABASE_ANON_KEY (preferred; matches Supabase docs)
+  // - NEXT_PUBLIC_SUPABASE_KEY (provided by container_env in this workspace)
+  const supabaseAnonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. Please set them in the environment.",
+      "Missing NEXT_PUBLIC_SUPABASE_URL and/or NEXT_PUBLIC_SUPABASE_ANON_KEY (or NEXT_PUBLIC_SUPABASE_KEY). Please set them in the environment.",
     );
   }
 

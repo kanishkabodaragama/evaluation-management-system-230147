@@ -69,6 +69,18 @@ export type MeResponse = {
   role: UserRole;
 };
 
+type BackendMeResponse = {
+  user: {
+    id: string;
+    email?: string;
+    // Backend role middleware sets req.user.appRole
+    appRole?: UserRole;
+    // Some tokens might also include role claim
+    role?: UserRole;
+  } | null;
+  auth?: unknown;
+};
+
 export type ListResponse<T> = {
   items: T[];
   total: number;
@@ -196,7 +208,19 @@ export type SessionReviewerAnalyticsRow = {
 // PUBLIC_INTERFACE
 export async function fetchMe(): Promise<MeResponse> {
   /** Fetch the current user profile from backend to determine role-based routing. */
-  return apiFetch<MeResponse>("/me");
+  const res = await apiFetch<BackendMeResponse>("/me");
+  if (!res.user?.id) {
+    throw new Error("Backend /me did not return a user. Are you logged in?");
+  }
+
+  const role = (res.user.appRole || res.user.role) as UserRole | undefined;
+  if (!role) {
+    throw new Error(
+      "Your account has no role assigned. Ask an admin to set app_metadata.role to 'admin' or 'reviewer' in Supabase.",
+    );
+  }
+
+  return { id: res.user.id, email: res.user.email, role };
 }
 
 function buildQuery(params: Record<string, unknown>) {
@@ -552,4 +576,47 @@ export function getEmployeesExportCsvUrl(args?: { session_id?: string }): string
   /** Build a direct-download URL for employees export CSV (optionally filtered by session_id). */
   const qs = buildQuery({ session_id: args?.session_id });
   return toAbsoluteApiUrl(`/api/analytics/employees/export.csv${qs}`);
+}
+
+// PUBLIC_INTERFACE
+export async function downloadCsv(path: string, filename: string): Promise<void> {
+  /**
+   * Download CSV from an authenticated endpoint.
+   *
+   * Why: The backend protects CSV exports with Bearer auth; a plain <a href>
+   * cannot reliably attach Authorization headers. This helper fetches with the
+   * Supabase access token and triggers a browser download.
+   */
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+
+  const token = await getAccessToken();
+  if (!token) throw new Error("Not authenticated");
+
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "text/csv",
+    },
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `CSV download failed (${res.status}) ${res.statusText}: ${text || "No body"}`,
+    );
+  }
+
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+
+  // Trigger download
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  URL.revokeObjectURL(blobUrl);
 }
