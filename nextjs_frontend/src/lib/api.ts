@@ -69,8 +69,225 @@ export type MeResponse = {
   role: UserRole;
 };
 
+export type ListResponse<T> = {
+  items: T[];
+  total: number;
+};
+
+export type Employee = {
+  id: string;
+  employee_code: string | null;
+  full_name: string;
+  email: string | null;
+  team: string | null;
+  title: string | null;
+  status: "active" | "inactive";
+  created_at: string;
+  updated_at: string;
+};
+
+export type Criterion = {
+  id: string;
+  name: string;
+  description: string | null;
+  weight: number;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ReviewSession = {
+  id: string;
+  name: string;
+  description: string | null;
+  start_date: string | null; // YYYY-MM-DD
+  end_date: string | null; // YYYY-MM-DD
+  status: "draft" | "active" | "closed" | "archived";
+  created_at: string;
+  updated_at: string;
+};
+
 // PUBLIC_INTERFACE
 export async function fetchMe(): Promise<MeResponse> {
   /** Fetch the current user profile from backend to determine role-based routing. */
   return apiFetch<MeResponse>("/me");
+}
+
+function buildQuery(params: Record<string, unknown>) {
+  const sp = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v === undefined || v === null) return;
+    if (typeof v === "string" && v.trim() === "") return;
+    sp.set(k, String(v));
+  });
+  const qs = sp.toString();
+  return qs ? `?${qs}` : "";
+}
+
+// Employees
+// PUBLIC_INTERFACE
+export async function listEmployees(args: {
+  limit: number;
+  offset: number;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  status?: "active" | "inactive";
+  team?: string;
+  q?: string;
+}): Promise<ListResponse<Employee>> {
+  /** List employees (admin-only). Supports pagination, sort, and filters. */
+  return apiFetch<ListResponse<Employee>>(`/api/employees${buildQuery(args)}`);
+}
+
+// PUBLIC_INTERFACE
+export async function createEmployee(payload: {
+  employee_code?: string | null;
+  full_name: string;
+  email?: string | null;
+  team?: string | null;
+  title?: string | null;
+  status?: "active" | "inactive";
+}): Promise<Employee> {
+  /** Create an employee (admin-only). */
+  const res = await apiFetch<{ item: Employee }>(`/api/employees`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return res.item;
+}
+
+// PUBLIC_INTERFACE
+export async function updateEmployee(
+  id: string,
+  payload: Partial<{
+    employee_code: string | null;
+    full_name: string;
+    email: string | null;
+    team: string | null;
+    title: string | null;
+    status: "active" | "inactive";
+  }>,
+): Promise<Employee> {
+  /** Update an employee (admin-only). */
+  const res = await apiFetch<{ item: Employee }>(`/api/employees/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+  return res.item;
+}
+
+// PUBLIC_INTERFACE
+export async function deleteEmployee(id: string): Promise<{ status: string }> {
+  /** Delete an employee (admin-only). */
+  return apiFetch<{ status: string }>(`/api/employees/${id}`, { method: "DELETE" });
+}
+
+// Criteria
+// PUBLIC_INTERFACE
+export async function listCriteria(args: {
+  limit: number;
+  offset: number;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  is_active?: boolean;
+}): Promise<ListResponse<Criterion>> {
+  /** List criteria (admin-only). Supports pagination, sort, and is_active filter. */
+  return apiFetch<ListResponse<Criterion>>(`/api/criteria${buildQuery(args)}`);
+}
+
+// PUBLIC_INTERFACE
+export async function createCriterion(payload: {
+  name: string;
+  description?: string | null;
+  weight?: number;
+  sort_order?: number;
+  is_active?: boolean;
+}): Promise<Criterion> {
+  /** Create a criterion (admin-only). */
+  const res = await apiFetch<{ item: Criterion }>(`/api/criteria`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return res.item;
+}
+
+// PUBLIC_INTERFACE
+export async function updateCriterion(
+  id: string,
+  payload: Partial<{
+    name: string;
+    description: string | null;
+    weight: number;
+    sort_order: number;
+    is_active: boolean;
+  }>,
+): Promise<Criterion> {
+  /** Update a criterion (admin-only). */
+  const res = await apiFetch<{ item: Criterion }>(`/api/criteria/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+  return res.item;
+}
+
+// PUBLIC_INTERFACE
+export async function deleteCriterion(id: string): Promise<{ status: string }> {
+  /** Delete a criterion (admin-only). */
+  return apiFetch<{ status: string }>(`/api/criteria/${id}`, { method: "DELETE" });
+}
+
+// Sessions
+// PUBLIC_INTERFACE
+export async function listSessions(args: {
+  limit: number;
+  offset: number;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  status?: "draft" | "active" | "closed" | "archived";
+  q?: string;
+}): Promise<ListResponse<ReviewSession>> {
+  /** List review sessions (admin-only). Supports pagination, sort, and filters. */
+  return apiFetch<ListResponse<ReviewSession>>(`/api/sessions${buildQuery(args)}`);
+}
+
+// PUBLIC_INTERFACE
+export async function createSession(payload: {
+  name: string;
+  description?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  status?: "draft" | "active" | "closed" | "archived";
+}): Promise<ReviewSession> {
+  /** Create a review session (admin-only). */
+  const res = await apiFetch<{ item: ReviewSession }>(`/api/sessions`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return res.item;
+}
+
+// PUBLIC_INTERFACE
+export async function updateSession(
+  id: string,
+  payload: Partial<{
+    name: string;
+    description: string | null;
+    start_date: string | null;
+    end_date: string | null;
+    status: "draft" | "active" | "closed" | "archived";
+  }>,
+): Promise<ReviewSession> {
+  /** Update a review session (admin-only). */
+  const res = await apiFetch<{ item: ReviewSession }>(`/api/sessions/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+  return res.item;
+}
+
+// PUBLIC_INTERFACE
+export async function deleteSession(id: string): Promise<{ status: string }> {
+  /** Delete a review session (admin-only). */
+  return apiFetch<{ status: string }>(`/api/sessions/${id}`, { method: "DELETE" });
 }
