@@ -149,6 +149,50 @@ export type Score = {
   updated_at: string;
 };
 
+export type SessionAnalyticsSummary = {
+  session: ReviewSession;
+  counts: {
+    session_id: string;
+    assignments_count: number;
+    submissions_count: number;
+    submissions_submitted_count: number;
+    assignments_completed_count: number;
+    assignment_completion_rate_pct: number; // 0-100
+  };
+  averages: {
+    avg_overall_score: number | null;
+    submissions_with_any_score_count: number;
+  };
+  per_criterion: Array<{
+    criterion_id: string;
+    criterion_name: string;
+    weight: number;
+    avg_score_value: number | null;
+    score_count: number;
+  }>;
+};
+
+export type SessionEmployeeAnalyticsRow = {
+  employee_id: string;
+  employee_code: string | null;
+  full_name: string;
+  email: string | null;
+  team: string | null;
+  assignments_count: number;
+  submissions_count: number;
+  submissions_submitted_count: number;
+  avg_overall_score: number | null;
+};
+
+export type SessionReviewerAnalyticsRow = {
+  reviewer_user_id: string;
+  reviewer_email: string | null;
+  assignments_count: number;
+  assignments_completed_count: number;
+  assignment_completion_rate_pct: number;
+  submissions_submitted_count: number;
+};
+
 // PUBLIC_INTERFACE
 export async function fetchMe(): Promise<MeResponse> {
   /** Fetch the current user profile from backend to determine role-based routing. */
@@ -434,6 +478,14 @@ export async function createScore(payload: {
   return res.item;
 }
 
+/**
+ * Returns the absolute URL for an API path (used for direct downloads like CSV).
+ */
+function toAbsoluteApiUrl(path: string): string {
+  const baseUrl = getApiBaseUrl();
+  return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 // PUBLIC_INTERFACE
 export async function updateScore(
   id: string,
@@ -448,4 +500,56 @@ export async function updateScore(
     body: JSON.stringify(payload),
   });
   return res.item;
+}
+
+// Analytics (admin-only)
+// PUBLIC_INTERFACE
+export async function getSessionAnalyticsSummary(
+  sessionId: string,
+): Promise<SessionAnalyticsSummary> {
+  /** Fetch session-level summary analytics. */
+  return apiFetch<SessionAnalyticsSummary>(
+    `/api/analytics/sessions/${encodeURIComponent(sessionId)}`,
+  );
+}
+
+// PUBLIC_INTERFACE
+export async function listSessionEmployeeAnalytics(args: {
+  sessionId: string;
+  limit: number;
+  offset: number;
+}): Promise<ListResponse<SessionEmployeeAnalyticsRow>> {
+  /** Paginated employee analytics rows within a session. */
+  const { sessionId, ...rest } = args;
+  return apiFetch<ListResponse<SessionEmployeeAnalyticsRow>>(
+    `/api/analytics/sessions/${encodeURIComponent(sessionId)}/employees${buildQuery(rest)}`,
+  );
+}
+
+// PUBLIC_INTERFACE
+export async function listSessionReviewerAnalytics(args: {
+  sessionId: string;
+  limit: number;
+  offset: number;
+}): Promise<ListResponse<SessionReviewerAnalyticsRow>> {
+  /** Paginated reviewer analytics rows within a session. */
+  const { sessionId, ...rest } = args;
+  return apiFetch<ListResponse<SessionReviewerAnalyticsRow>>(
+    `/api/analytics/sessions/${encodeURIComponent(sessionId)}/reviewers${buildQuery(rest)}`,
+  );
+}
+
+// PUBLIC_INTERFACE
+export function getSessionExportCsvUrl(sessionId: string): string {
+  /** Build a direct-download URL for session export CSV. */
+  return toAbsoluteApiUrl(
+    `/api/analytics/sessions/${encodeURIComponent(sessionId)}/export.csv`,
+  );
+}
+
+// PUBLIC_INTERFACE
+export function getEmployeesExportCsvUrl(args?: { session_id?: string }): string {
+  /** Build a direct-download URL for employees export CSV (optionally filtered by session_id). */
+  const qs = buildQuery({ session_id: args?.session_id });
+  return toAbsoluteApiUrl(`/api/analytics/employees/export.csv${qs}`);
 }
