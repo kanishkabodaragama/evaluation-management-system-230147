@@ -195,7 +195,8 @@ export function FormActions({ children }: { children: React.ReactNode }) {
 }
 
 // PUBLIC_INTERFACE
-export function useStableMemo<T>(factory: () => T, deps: unknown[]) {
-  /** Convenience wrapper around useMemo to keep usage consistent in pages. */
-  return useMemo(factory, deps);
+export function useStableMemo<T>(value: T, deps: unknown[]) {
+  /** Convenience wrapper around useMemo; pass a computed value alongside explicit deps. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => value, deps);
 }

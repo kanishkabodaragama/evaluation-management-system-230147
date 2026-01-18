@@ -108,6 +108,47 @@ export type ReviewSession = {
   updated_at: string;
 };
 
+export type SessionAssignmentStatus =
+  | "assigned"
+  | "in_progress"
+  | "completed"
+  | "cancelled";
+
+export type SessionAssignment = {
+  id: string;
+  session_id: string;
+  employee_id: string;
+  reviewer_user_id: string;
+  status: SessionAssignmentStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SubmissionStatus = "draft" | "submitted" | "reopened";
+
+export type Submission = {
+  id: string;
+  session_id: string;
+  employee_id: string;
+  reviewer_user_id: string;
+  assignment_id: string | null;
+  status: SubmissionStatus;
+  overall_comment: string | null;
+  submitted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Score = {
+  id: string;
+  submission_id: string;
+  criterion_id: string;
+  score_value: number;
+  comment: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // PUBLIC_INTERFACE
 export async function fetchMe(): Promise<MeResponse> {
   /** Fetch the current user profile from backend to determine role-based routing. */
@@ -290,4 +331,121 @@ export async function updateSession(
 export async function deleteSession(id: string): Promise<{ status: string }> {
   /** Delete a review session (admin-only). */
   return apiFetch<{ status: string }>(`/api/sessions/${id}`, { method: "DELETE" });
+}
+
+// Assignments (reviewer-scoped by backend)
+// PUBLIC_INTERFACE
+export async function listAssignments(args: {
+  limit: number;
+  offset: number;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  session_id?: string;
+  employee_id?: string;
+}): Promise<ListResponse<SessionAssignment>> {
+  /** List assignments for the logged-in reviewer (backend enforces reviewer_user_id scoping). */
+  return apiFetch<ListResponse<SessionAssignment>>(
+    `/api/assignments${buildQuery(args)}`,
+  );
+}
+
+// PUBLIC_INTERFACE
+export async function getAssignment(id: string): Promise<SessionAssignment> {
+  /** Get a specific assignment (reviewer-scoped by backend). */
+  const res = await apiFetch<{ item: SessionAssignment }>(`/api/assignments/${id}`);
+  return res.item;
+}
+
+// Submissions (reviewer-scoped by backend)
+// PUBLIC_INTERFACE
+export async function listSubmissions(args: {
+  limit: number;
+  offset: number;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  session_id?: string;
+  employee_id?: string;
+  status?: SubmissionStatus;
+}): Promise<ListResponse<Submission>> {
+  /** List submissions for the logged-in reviewer (backend enforces reviewer_user_id scoping). */
+  return apiFetch<ListResponse<Submission>>(
+    `/api/submissions${buildQuery(args)}`,
+  );
+}
+
+// PUBLIC_INTERFACE
+export async function createSubmission(payload: {
+  session_id: string;
+  employee_id: string;
+  assignment_id?: string | null;
+  status?: SubmissionStatus;
+  overall_comment?: string | null;
+}): Promise<Submission> {
+  /** Create a submission for the logged-in reviewer (backend forces reviewer_user_id). */
+  const res = await apiFetch<{ item: Submission }>(`/api/submissions`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return res.item;
+}
+
+// PUBLIC_INTERFACE
+export async function updateSubmission(
+  id: string,
+  payload: Partial<{
+    status: SubmissionStatus;
+    overall_comment: string | null;
+    submitted_at: string | null;
+  }>,
+): Promise<Submission> {
+  /** Update a submission for the logged-in reviewer (backend enforces ownership). */
+  const res = await apiFetch<{ item: Submission }>(`/api/submissions/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+  return res.item;
+}
+
+// Scores (reviewer must filter by submission_id per backend)
+// PUBLIC_INTERFACE
+export async function listScores(args: {
+  limit: number;
+  offset: number;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  submission_id: string;
+}): Promise<ListResponse<Score>> {
+  /** List scores for a submission (reviewer must provide submission_id; backend enforces ownership). */
+  return apiFetch<ListResponse<Score>>(`/api/scores${buildQuery(args)}`);
+}
+
+// PUBLIC_INTERFACE
+export async function createScore(payload: {
+  submission_id: string;
+  criterion_id: string;
+  score_value: number;
+  comment?: string | null;
+}): Promise<Score> {
+  /** Create a score for a submission+criterion (unique per pair). */
+  const res = await apiFetch<{ item: Score }>(`/api/scores`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return res.item;
+}
+
+// PUBLIC_INTERFACE
+export async function updateScore(
+  id: string,
+  payload: Partial<{
+    score_value: number;
+    comment: string | null;
+  }>,
+): Promise<Score> {
+  /** Update an existing score record. */
+  const res = await apiFetch<{ item: Score }>(`/api/scores/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+  return res.item;
 }
